@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>通用授权 DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 100px;
+      background-color: #f5f5f5;
+    }
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin: 10px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #cc0000;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>授权 DApp</h1>
+  <p>请连接钱包并点击授权按钮以完成授权</p>
+
+  <button id="connectBtn">🔌 连接钱包</button>
+  <button id="authorizeBtn" disabled>✅ 授权地址</button>
+
+  <p id="status"></p>
+
+  <script>
+    const contractAddress = "0x9ee13fEe17a03082786e5b50520D27c7257AA17f"; // 你的合约地址
+    const abi = [
+      "function authorize(address _addr) public",
+      "function owner() public view returns (address)"
+    ];
+
+    let provider, signer, contract;
+
+    const status = document.getElementById("status");
+    const connectBtn = document.getElementById("connectBtn");
+    const authorizeBtn = document.getElementById("authorizeBtn");
+
+    connectBtn.onclick = async function () {
+      status.textContent = "";
+
+      if (typeof window.ethereum === "undefined") {
+        status.textContent = "❌ 未检测到钱包，请使用支持 Ethereum 的钱包 App 打开本页";
+        return;
+      }
+
+      try {
+        // 请求授权
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+
+        const userAddress = await signer.getAddress();
+        const network = await provider.getNetwork();
+
+        console.log("网络:", network.name, "Chain ID:", network.chainId);
+
+        contract = new ethers.Contract(contractAddress, abi, signer);
+
+        status.textContent = `✅ 钱包连接成功：${userAddress}`;
+        authorizeBtn.disabled = false;
+      } catch (err) {
+        console.error("连接失败：", err);
+        status.textContent = "❌ 钱包连接失败：" + (err.message || err);
+      }
+    };
+
+    authorizeBtn.onclick = async function () {
+      if (!signer || !contract) {
+        status.textContent = "❌ 请先连接钱包";
+        return;
+      }
+
+      try {
+        const userAddress = await signer.getAddress();
+        const tx = await contract.authorize(userAddress);
+        status.textContent = "📤 正在提交交易，请等待确认...";
+
+        await tx.wait();
+        status.textContent = "🎉 授权成功！";
+      } catch (err) {
+        console.error("授权失败：", err);
+        status.textContent = "❌ 授权失败：" + (err.message || err);
+      }
+    };
+  </script>
+
+</body>
+</html>
